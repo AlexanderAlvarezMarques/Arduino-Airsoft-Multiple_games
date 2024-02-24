@@ -11,6 +11,17 @@ const byte menuArrorChar[8] = {
       B11000
     };
 
+const byte LoadBarChar[8] = {
+      B11111,
+      B11111,
+      B11111,
+      B11111,
+      B11111,
+      B11111,
+      B11111,
+      B11111,
+    };
+
 // Constructor implementation
 LCD_Display::LCD_Display(byte _address, int _cols, int _rows, int _sda, int _scl)
     : // With this line we init all attributes
@@ -28,6 +39,7 @@ void LCD_Display::begin() {
 
   // Custom chars
   lcd.createChar(0, menuArrorChar);
+  lcd.createChar(1, LoadBarChar);
 }
 
 void LCD_Display::clear() {
@@ -60,6 +72,11 @@ void LCD_Display::printCursor(int row) {
   lcd.write((uint8_t)0); // o => index of char defined in begin function
 }
 
+void LCD_Display::printLoadBar(int col, int row) {
+  lcd.setCursor(col, row);
+  lcd.write((uint8_t) 1);
+}
+
 void LCD_Display::write(char* msg, int col, int row) {
   lcd.setCursor(col, row);
   lcd.print(msg);
@@ -85,4 +102,8 @@ void LCD_Display::timeLimit(int minutes, int seconds) {
 
 int LCD_Display::getRows() {
   return rows;
+}
+
+int LCD_Display::getCols() {
+  return cols;
 }

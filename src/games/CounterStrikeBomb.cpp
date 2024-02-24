@@ -1,8 +1,11 @@
 #include "CounterStrikeBomb.h"
 #include <Arduino.h>
+#include "../libs/Buzzer.h"
 
-CounterStrikeBomb::CounterStrikeBomb(LCD_Display& lcd) : lcdDisplay(lcd) {
-
+CounterStrikeBomb::CounterStrikeBomb(LCD_Display& lcd, Buzzer& _buzzer) :
+    lcdDisplay(lcd),
+    buzzer(_buzzer)
+{
 }
 
 const char* CounterStrikeBomb::getName() {
@@ -17,6 +20,7 @@ void CounterStrikeBomb::init() {
     isTimeLimitSet = false;
     isConfigSet = false;
     exitGame = 0;
+    bombActive = false;
 
     for (int i = 0; i < passwordSize; i++) {
         password[i] = 0;
@@ -118,69 +122,98 @@ void CounterStrikeBomb::updateInConfigStatus(int key) {
         isConfigSet = true;
         showMenu();
     }
-
 }
 
 void CounterStrikeBomb::updateInGameStatus(int key) {
 
-    if (timeLeft > 0) {
-        int lapseTime = timer.getIntervalInSeconds();
+    if (key == 15) {
+        exitGame++;
 
-        if (lapseTime >= 1) {
-            timeLeft--;
-            showDetonationTime();
+        if (exitGame == 3) {
+            init();
+            showMenu();
+            return;
         }
+    }
 
+    if (!bombActive) {
         if (key >= 0 && key <= 9) {
-            if (passwordCursorPos == 0) lcdDisplay.clearRowAfterCol(6, 1);
-            lcdDisplay.write(key, 6 + passwordCursorPos, 1);
+            if (passwordCursorPos == 0) lcdDisplay.clearRowAfterCol(0, 1);
+            lcdDisplay.write(key, passwordCursorPos, 1);
 
             defusePassword[passwordCursorPos] = key;
             passwordCursorPos++;
 
             if (passwordCursorPos >= passwordSize) passwordCursorPos = 0;
-        } else {
-            if (key == 11) { // # => 11
-                if (checkDefusePassword()) {
-                    timeLeft = 0;
-                } else {
-                    for (int i = 0; i < 4; i++) {
-                        lcdDisplay.write("Invalido", 6, 1);
-                        delay(250);
-                        lcdDisplay.clearRowAfterCol(6, 1);
-                        delay(250);
-                    }
-
-                    passwordCursorPos = 0;
+        } else if (key == 11) {
+            if (checkDefusePassword()) {
+                bombActive = true;
+                for (int i = 0; i < passwordSize; i++) {
+                    defusePassword[i] = -1;
                 }
-            }
 
-            if (key == 15) {
-                exitGame++;
-
-                if (exitGame == 3) {
-                    init();
-                    showMenu();
-                }
+                lcdDisplay.clear();
+                lcdDisplay.write("Desactivar", 0, 0);
+                lcdDisplay.write("Clave", 0, 1);
             }
         }
-
     } else {
-        lcdDisplay.clear();
-        lcdDisplay.write("Ganador equipo:", 0, 0);
+        if (timeLeft > 0) {
+            int lapseTime = timer.getIntervalInSeconds();
 
-        for (int i = 4; i > 0; i--) {
+            if (lapseTime >= 1) {
+                timeLeft--;
+                showDetonationTime();
+
+                if (timeLeft > 60) buzzer.beep();
+                else buzzer.beepTree();
+            }
+
+            if (key >= 0 && key <= 9) {
+                if (passwordCursorPos == 0) lcdDisplay.clearRowAfterCol(6, 1);
+                lcdDisplay.write(key, 6 + passwordCursorPos, 1);
+
+                defusePassword[passwordCursorPos] = key;
+                passwordCursorPos++;
+
+                if (passwordCursorPos >= passwordSize) passwordCursorPos = 0;
+            } else {
+                if (key == 11) { // # => 11
+                    Serial.println("Active");
+                    if (checkDefusePassword()) {
+                        timeLeft = 0;
+                    } else {
+                        for (int i = 0; i < 4; i++) {
+                            lcdDisplay.write("Invalido", 6, 1);
+                            delay(250);
+                            lcdDisplay.clearRowAfterCol(6, 1);
+                            delay(250);
+                        }
+
+                        passwordCursorPos = 0;
+                    }
+                }
+            }
+        } else {
+            lcdDisplay.clear();
+            lcdDisplay.write("Ganador equipo:", 0, 0);
             char* winner = checkDefusePassword() ? "Anti terrorista" : "Terrorista";
             lcdDisplay.write(winner, 0, 1);
-            delay(500);
-            lcdDisplay.clearRow(1);
-            delay(500);
-        }
 
-        status = GameStatus::MENU;
-        timeLeft = timeLimit;
-        showMenu();
-    }
+            if (winner == "Anti terrorista") {
+                buzzer.playAntiterroristWin();
+            } else {
+                buzzer.playTerroristWin();
+            }
+
+            status = GameStatus::MENU;
+            passwordCursorPos = 0;
+            bombActive = false;
+            for (int i = 0; i < passwordSize; i++) defusePassword[i] = -1;
+            timeLeft = timeLimit;
+            showMenu();
+        }
+    }   
 }
 
 void CounterStrikeBomb::readPassword(int key) {
@@ -191,24 +224,21 @@ void CounterStrikeBomb::readPassword(int key) {
 
         lcdDisplay.clear();
         lcdDisplay.write("Tiempo (min)", 0, 0);
-    }
+    } else if (key >= 0 && key <= 9) {
+        if (passwordCursorPos == passwordSize) {
+            lcdDisplay.clearRow(1);
+            passwordCursorPos = 0;
+        }
 
-    password[passwordCursorPos] = (char) key;
-    lcdDisplay.write(key, passwordCursorPos, 1);
-    passwordCursorPos++;
-
-    if (passwordCursorPos == passwordSize) {
-        isPasswordSet = true;
-        passwordCursorPos = 0;
-
-        lcdDisplay.clear();
-        lcdDisplay.write("Tiempo (min)", 0, 0);
+        password[passwordCursorPos] = (char) key;
+        lcdDisplay.write(key, passwordCursorPos, 1);
+        passwordCursorPos++;
     }
 }
 
 void CounterStrikeBomb::readTimeLimit(int key) {
     
-    if (key == 14) {
+    if (key == 14 && timeLimit > 0) {
         isTimeLimitSet = true;
         timeLimit *= 60; // Transform to seconds
         timeLeft = timeLimit;
@@ -216,6 +246,11 @@ void CounterStrikeBomb::readTimeLimit(int key) {
     } else {
         timeLimit = (timeLimit * 10) + key;
         lcdDisplay.write(timeLimit, 0, 1);
+
+        if (timeLimit > 60) {
+            lcdDisplay.clearRow(1);
+            timeLimit = 0;
+        }
     }
 }
 
@@ -227,12 +262,15 @@ void CounterStrikeBomb::checkAction(int key) {
         status = GameStatus::IN_GAME;
         timer.start(1); // Update at 1s
         lcdDisplay.clear();
-        lcdDisplay.write("Detonacion ", 0, 0);
-        lcdDisplay.write("Clave ", 0, 1);
+        lcdDisplay.write("Cod. Activacion ", 0, 0);
     }
 
     if (currentMenu == "Configurar") {
         status = GameStatus::CONFIG;
+        passwordCursorPos = 0;
+        isConfigSet = false;
+        isPasswordSet = false;
+        isTimeLimitSet = false;
         lcdDisplay.clear();
         lcdDisplay.write("Clave [", 0, 0);
         lcdDisplay.write(passwordSize, 7, 0);
@@ -242,7 +280,6 @@ void CounterStrikeBomb::checkAction(int key) {
     if (currentMenu == "Salir") {
         status = GameStatus::ENDED;
     }
-
 }
 
 bool CounterStrikeBomb::checkDefusePassword() {
@@ -264,53 +301,4 @@ void CounterStrikeBomb::showDetonationTime() {
     lcdDisplay.write(":", 13, 0);
     lcdDisplay.write(sec / 10, 14, 0);
     lcdDisplay.write(sec % 10, 15, 0);
-}
-
-void CounterStrikeBomb::showAttributesInSerialMonitor() {
-    // Print attribute values to Serial Monitor
-    Serial.println("----------------------------------");
-    Serial.println("----------------------------------");
-    Serial.println("Counter-Strike Bomb Attributes:");
-    Serial.print("cursorPos: ");
-    Serial.println(cursorPos);
-    Serial.print("passwordCursorPos: ");
-    Serial.println(passwordCursorPos);
-    Serial.print("Password: ");
-    for (int i = 0; i < passwordSize; i++) {
-        Serial.print(password[i]);
-        Serial.print(" ");
-    }
-    Serial.println();
-    Serial.print("isPasswordSet: ");
-    Serial.println(isPasswordSet);
-    Serial.print("timeLeft: ");
-    Serial.println(timeLeft);
-    Serial.print("timeLimit: ");
-    Serial.println(timeLimit);
-    Serial.print("isTimeLimitSet: ");
-    Serial.println(isTimeLimitSet);
-    Serial.print("status: ");
-    switch (status) {
-        case MENU:
-            Serial.println("MENU");
-            break;
-        case CONFIG:
-            Serial.println("CONFIG");
-            break;
-        case IN_GAME:
-            Serial.println("IN_GAME");
-            break;
-        case PAUSED:
-            Serial.println("PAUSED");
-            break;
-        case ENDED:
-            Serial.println("ENDED");
-            break;
-        default:
-            Serial.println("Unknown status");
-            break;
-    }
-
-    Serial.println("----------------------------------");
-    Serial.println("----------------------------------");
 }

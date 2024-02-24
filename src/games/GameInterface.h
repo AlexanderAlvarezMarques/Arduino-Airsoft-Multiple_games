@@ -25,8 +25,6 @@ class GameInterface {
 
     virtual int updateStatus(int key) = 0;
 
-    virtual void showAttributesInSerialMonitor() = 0;
-
 };
 
 #endif

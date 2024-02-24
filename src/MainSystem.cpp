@@ -17,12 +17,6 @@ void MainSystem::showMainMenu() {
     lcdDisplay.clear();
     lcdDisplay.printCursor(selectorPos);
 
-    // for (int i = cursorPos; i < availableGames.size() && (i - cursorPos) < rows; ++i)
-    // {
-    //     char* name = availableGames.at(i)->getName();
-    //     lcdDisplay.write(name, i == selectorPos ? 2 : 0, i);
-    // }
-
     for (int i = 0; i < rows; i++) {
         int gameIndex = cursorPos - selectorPos + i;
         if (gameIndex >= 0 && gameIndex < availableGames.size()) {

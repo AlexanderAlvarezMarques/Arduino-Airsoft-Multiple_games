@@ -45,6 +45,8 @@ class LCD_Display {
 
     void printCursor(int row);
 
+    void printLoadBar(int col, int row);
+
     void write(char* msg, int col, int row);
 
     void write(int num, int col, int row);
@@ -56,6 +58,8 @@ class LCD_Display {
     void timeLimit(int minutes, int seconds);
 
     int getRows();
+
+    int getCols();
 };
 
 #endif

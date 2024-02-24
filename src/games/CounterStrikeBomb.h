@@ -4,6 +4,7 @@
 #include "GameInterface.h"
 #include "../libs/LCD_Display.h"
 #include "../libs/Timer.h"
+#include "../libs/Buzzer.h"
 
 class CounterStrikeBomb : public GameInterface {
 
@@ -17,6 +18,7 @@ private:
     };
 
     LCD_Display& lcdDisplay;
+    Buzzer& buzzer;
     
     int cursorPos;
 
@@ -30,6 +32,7 @@ private:
     int timeLeft;  // Time left to defuse the bomb in seconds
     int timeLimit;
     bool isTimeLimitSet;
+    bool bombActive = false;
 
     bool isConfigSet = false;
     int exitGame = 0;
@@ -59,7 +62,7 @@ private:
 
 public:
     
-    CounterStrikeBomb(LCD_Display& lcd);
+    CounterStrikeBomb(LCD_Display& lcd, Buzzer& _buzzer);
     
     const char* getName() override;
 
@@ -73,7 +76,7 @@ public:
     
     int updateStatus(int key) override;
 
-    void showAttributesInSerialMonitor() override;
+    void showAttributesInSerialMonitor();
 };
 
 #endif

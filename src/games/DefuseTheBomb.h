@@ -39,7 +39,7 @@ public:
     
     int updateStatus(int key) override;
 
-    void showAttributesInSerialMonitor() override;
+    void showAttributesInSerialMonitor();
 };
 
 #endif
